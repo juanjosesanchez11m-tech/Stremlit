@@ -12,85 +12,92 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Función para descargar y cargar datos
+# 2. Carga de datos desde Kaggle
 @st.cache_data
 def cargar_datos():
     try:
         path = kagglehub.dataset_download("martinclark/peru-covid19-august-2020")
-        archivo_csv = [f for f in os.listdir(path) if f.endswith('.csv')][0]
-        full_path = os.path.join(path, archivo_csv)
-        df = pd.read_csv(full_path)
+        archivos = [f for f in os.listdir(path) if f.endswith('.csv')]
+        if not archivos:
+            return None
+        df = pd.read_csv(os.path.join(path, archivos[0]))
         if 'FECHA_RESULTADO' in df.columns:
             df['FECHA_RESULTADO'] = pd.to_datetime(df['FECHA_RESULTADO'], errors='coerce')
         return df
     except Exception as e:
-        st.error(f"Error al conectar con los datos: {e}")
+        st.error(f"Error al cargar datos: {e}")
         return None
 
 df = cargar_datos()
 
-# 3. Navegación Lateral
+# 3. Sidebar (Menú lateral)
 with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/8/82/SARS-CoV-2_without_background.png", width=100)
-    st.title("Talentotech")
-    menu = st.radio("Secciones", ["Inicio", "Panel de Trabajo"])
+    st.title("TalentoTech")
+    st.write("Nivel Integradores")
+    seccion = st.radio("Ir a:", ["Landing Page", "Panel de Trabajo"])
     st.divider()
-    st.write("Autor: **Juan Jose Sánchez**")
+    st.write("👨‍💻 Autor: **Juan Jose Sánchez**")
 
-# 4. Sección: Inicio (Landing Page)
-if menu == "Inicio":
-    st.title("🦠 Análisis del COVID-19 en Perú")
+# 4. Sección: Landing Page
+if seccion == "Landing Page":
+    st.title("📊 Análisis de Datos COVID-19 Perú")
     
     col1, col2 = st.columns([2, 1])
+    
     with col1:
+        st.subheader("Bienvenido al Proyecto Integrador")
         st.markdown("""
-        ### Contexto del Dataset
-        Como experto en análisis de datos, este panel explora la base de datos de casos positivos en Perú hasta agosto de 2020. 
-        El objetivo es aplicar los conocimientos integradores del curso de **Talentotech** para visualizar el impacto regional y demográfico.
+        Esta aplicación utiliza un dataset de **Kaggle** para analizar el impacto de la pandemia en Perú 
+        hasta agosto de 2020. Como expertos en datos, exploraremos la distribución regional y demográfica.
         
         **Instrucciones:**
-        1. Seleccione 'Panel de Trabajo' en el menú lateral.
-        2. Use los filtros para segmentar por región.
-        3. Consulte la documentación en las pestañas internas.
+        - Navega al **Panel de Trabajo** para ver los gráficos.
+        - Usa los filtros para seleccionar departamentos específicos.
+        - Consulta la documentación técnica en las pestañas.
         """)
+    
     with col2:
-        st.image("https://cdn.pixabay.com/photo/2020/04/19/07/13/coronavirus-5062217_1280.png")
+        # NOMBRE DE IMAGEN CORREGIDO AQUÍ:
+        try:
+            st.image("images1.jfif", caption="Estructura del virus SARS-CoV-2", use_container_width=True)
+        except:
+            st.warning("⚠️ No se pudo cargar 'images1.jfif'. Verifica que el nombre en GitHub sea exacto.")
 
 # 5. Sección: Panel de Trabajo
 else:
-    st.title("📈 Centro de Análisis Estadístico")
+    st.title("📈 Panel de Análisis Técnico")
     
     if df is not None:
-        departamentos = st.multiselect(
-            "Filtrar Departamentos:", 
-            options=list(df['DEPARTAMENTO'].unique()),
-            default=df['DEPARTAMENTO'].unique()[:5]
-        )
+        # Filtros profesionales
+        deptos = st.multiselect("Seleccione Departamentos:", 
+                               options=list(df['DEPARTAMENTO'].unique()), 
+                               default=df['DEPARTAMENTO'].unique()[:5])
         
-        df_filt = df[df['DEPARTAMENTO'].isin(departamentos)]
-        tab_graf, tab_info = st.tabs(["📊 Gráficos Seaborn", "📖 Documentación"])
+        df_filt = df[df['DEPARTAMENTO'].isin(deptos)]
+        
+        tab1, tab2 = st.tabs(["📊 Gráficos Estadísticos", "📖 Documentación"])
 
-        with tab_graf:
-            # Gráfico de Barras
-            st.subheader("Contagios por Región")
+        with tab1:
+            # Gráfico 1: Seaborn Countplot
+            st.subheader("Distribución de Casos por Departamento")
             fig1, ax1 = plt.subplots(figsize=(10, 5))
-            sns.countplot(data=df_filt, y='DEPARTAMENTO', palette="mako", ax=ax1)
+            sns.countplot(data=df_filt, y='DEPARTAMENTO', palette="viridis", ax=ax1)
             st.pyplot(fig1)
-            st.info("💡 Ayuda: Visualización de la magnitud de contagios por departamento seleccionado.")
+            st.info("💡 Este gráfico muestra el volumen total de contagios por cada región seleccionada.")
 
             st.divider()
 
-            # Gráfico de Torta
-            st.subheader("Distribución por Género")
+            # Gráfico 2: Distribución por Género
+            st.subheader("Proporción por Sexo")
             fig2, ax2 = plt.subplots()
-            sex_data = df_filt['SEXO'].value_counts()
-            plt.pie(sex_data, labels=sex_data.index, autopct='%1.1f%%', colors=sns.color_palette("pastel"))
+            counts = df_filt['SEXO'].value_counts()
+            plt.pie(counts, labels=counts.index, autopct='%1.1f%%', colors=sns.color_palette("pastel"))
             st.pyplot(fig2)
-            st.info("💡 Ayuda: Este gráfico circular permite identificar qué género reportó más casos positivos.")
+            st.info("💡 Muestra la distribución porcentual entre hombres y mujeres en la muestra filtrada.")
 
-        with tab_info:
-            st.markdown("### Información del Procesamiento")
-            st.write("Los datos han sido pre-procesados para asegurar que las fechas y categorías sean consistentes.")
-            st.dataframe(df_filt.head(10))
+        with tab2:
+            st.markdown("### Detalles del Dataset")
+            st.write("Datos procesados del Ministerio de Salud (MINSA) de Perú.")
+            st.dataframe(df_filt.head(20))
     else:
-        st.error("Dataset no encontrado.")
+        st.error("No se pudieron cargar los datos de Kaggle.")
